@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Odoo Inventory Scanner",
+    "slug": "inventory-management-odoo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "inventorymanagementodoo",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.victorascencao.odooinventoryscanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to camera to scan barcodes."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#875A7B"
+      },
+      "package": "com.victorascencao.odooinventoryscanner",
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow this app to access your camera to scan barcodes."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#875A7B"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "95fd03a5-17b6-4c22-805d-de15f2d623d9"
+      }
+    },
+    "owner": "victorascencao",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/95fd03a5-17b6-4c22-805d-de15f2d623d9"
+    }
+  }
+}
