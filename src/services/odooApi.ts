@@ -101,11 +101,11 @@ class OdooAPIService {
   }
 
   async createStockMove(move: StockMove): Promise<boolean> {
-    if (!this.config || !this.sessionId) {
-      await this.authenticate();
-    }
-
     try {
+      if (!this.config) return false;
+      if (!this.sessionId && !(await this.authenticate())) return false;
+      if (!this.sessionId) return false;
+
       const picking_type_id = move.type === 'in' ? 1 : 2;
       
       const response = await axios.post(
@@ -141,7 +141,10 @@ class OdooAPIService {
         }
       );
 
-      return !!response.data.result;
+      // A create call confirms a transfer record, not a validated stock movement.
+      // JSON-RPC errors may arrive with HTTP 200; truthy data is not enough.
+      const pickingId = response.data?.result;
+      return !response.data?.error && Number.isSafeInteger(pickingId) && pickingId > 0;
     } catch (error) {
       console.error('Stock move creation failed:', error);
       return false;

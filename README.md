@@ -69,7 +69,14 @@ npm start
 2. Select mode (SCAN IN or SCAN OUT)
 3. Point camera at barcode
 4. Confirm quantity and action
-5. Product inventory is updated in Odoo
+5. After Odoo confirms transfer creation, the scan is saved locally as synced
+6. Validate the transfer in Odoo to complete the stock movement
+
+The scanner creates a `stock.picking` record; `synced` means Odoo confirmed
+creation, not that the receipt or delivery has been validated. If confirmation
+fails, the scanner keeps the product and quantity for review and does not save a
+synced scan. Check Odoo before retrying: a lost network response can leave the
+outcome uncertain, and creating transfers is not idempotent.
 
 ### Manual Entry
 
@@ -123,6 +130,20 @@ npm start
 ```
 
 This will start the Expo development server. Use the Expo Go app on your device to test.
+
+### Receiving regression tests
+
+```bash
+npm ci
+npm test -- --watch=false
+```
+
+These tests use Jest with the Expo preset. HTTP, credentials, device APIs, and
+local storage are mocked; no live Odoo instance or existing inventory data is
+accessed. Coverage includes confirmed transfers, rejected/invalid JSON-RPC
+responses, authentication and network failures, preservation of existing history,
+and duplicate submission prevention. The tests do not establish compatibility
+with a particular live Odoo version or validate receipts against purchase orders.
 
 ## Building for Production
 
