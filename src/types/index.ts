@@ -50,6 +50,7 @@ export interface OdooConfig {
 
 export interface ScanHistory {
   id: string;
+  product_id?: number;
   barcode: string;
   product_name: string;
   quantity: number;

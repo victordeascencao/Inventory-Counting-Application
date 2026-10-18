@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import odooApi from '../../src/services/odooApi';
 import { saveScanHistory } from '../../src/services/localStorage';
-import { Product, ScanHistory } from '../../src/types';
+import { Product, ScanHistory, StockMove } from '../../src/types';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +30,7 @@ export default function ScannerScreen() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const isSubmitting = useRef(false);
   
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -121,7 +122,7 @@ export default function ScannerScreen() {
   };
 
   const confirmScan = async () => {
-    if (!scannedProduct) return;
+    if (!scannedProduct || isSubmitting.current) return;
     
     const qty = parseInt(quantity);
     if (isNaN(qty) || qty <= 0) {
@@ -129,15 +130,31 @@ export default function ScannerScreen() {
       return;
     }
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Lock before the first await so rapid taps cannot submit twice.
+    isSubmitting.current = true;
     setIsLoading(true);
+    let confirmedByOdoo = false;
     
     try {
-      await odooApi.createStockMove(
-        scannedProduct.id,
-        qty,
-        scanMode
-      );
+      const move: StockMove = {
+        product_id: scannedProduct.id,
+        product_name: scannedProduct.name,
+        barcode: scannedProduct.barcode,
+        quantity: qty,
+        type: scanMode,
+        location: scannedProduct.location || 'Main Warehouse',
+        timestamp: new Date(),
+      };
+      const moveSuccess = await odooApi.createStockMove(move);
+
+      if (moveSuccess !== true) {
+        Alert.alert(
+          'Transfer Not Confirmed',
+          'Odoo did not confirm this transfer. Check the transfer in Odoo before retrying to avoid duplicates.'
+        );
+        return;
+      }
+      confirmedByOdoo = true;
 
       const scanRecord: ScanHistory = {
         id: Date.now().toString(),
@@ -146,20 +163,34 @@ export default function ScannerScreen() {
         barcode: scannedProduct.barcode,
         quantity: qty,
         type: scanMode,
-        timestamp: new Date(),
+        timestamp: move.timestamp,
         synced: true,
       };
 
       await saveScanHistory(scanRecord);
+      resetScanner();
+      // Optional device feedback must not turn a confirmed transfer into a failure.
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       
       Alert.alert(
-        'Success',
-        `${scannedProduct.name} ${scanMode === 'in' ? 'added to' : 'removed from'} inventory`,
-        [{ text: 'OK', onPress: resetScanner }]
+        'Transfer Saved',
+        `Stock ${scanMode === 'in' ? 'in' : 'out'} transfer for ${scannedProduct.name} saved to Odoo. Validate the transfer in Odoo to complete the stock movement.`
       );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update inventory');
+    } catch {
+      if (confirmedByOdoo) {
+        resetScanner();
+        Alert.alert(
+          'History Not Saved',
+          'Odoo confirmed the transfer, but local history could not be saved. Check Odoo; do not submit the same transfer again.'
+        );
+      } else {
+        Alert.alert(
+          'Transfer Not Confirmed',
+          'The connection failed before the transfer could be confirmed. Check the transfer in Odoo before retrying to avoid duplicates.'
+        );
+      }
     } finally {
+      isSubmitting.current = false;
       setIsLoading(false);
     }
   };
@@ -342,7 +373,7 @@ export default function ScannerScreen() {
           <View style={styles.productModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Confirm {scanMode === 'in' ? 'Stock In' : 'Stock Out'}</Text>
-              <TouchableOpacity onPress={resetScanner}>
+              <TouchableOpacity onPress={resetScanner} disabled={isLoading}>
                 <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -375,6 +406,7 @@ export default function ScannerScreen() {
                   <View style={styles.quantityControls}>
                     <TouchableOpacity 
                       style={styles.quantityButton}
+                      disabled={isLoading}
                       onPress={async () => {
                         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         const qty = parseInt(quantity) - 1;
@@ -388,12 +420,14 @@ export default function ScannerScreen() {
                       style={styles.quantityInput}
                       value={quantity}
                       onChangeText={setQuantity}
+                      editable={!isLoading}
                       keyboardType="numeric"
                       selectTextOnFocus
                     />
                     
                     <TouchableOpacity 
                       style={styles.quantityButton}
+                      disabled={isLoading}
                       onPress={async () => {
                         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         const qty = parseInt(quantity) + 1;
@@ -409,6 +443,7 @@ export default function ScannerScreen() {
                   <TouchableOpacity 
                     style={styles.cancelButton}
                     onPress={resetScanner}
+                    disabled={isLoading}
                   >
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
